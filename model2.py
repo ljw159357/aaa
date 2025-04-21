@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import streamlit as st
 import joblib
 import numpy as np
@@ -11,10 +5,6 @@ import pandas as pd
 import shap
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-
-
-# In[2]:
-
 
 # 加载模型
 model = joblib.load('xgb.pkl')
@@ -121,10 +111,6 @@ if st.button("Predict"):
     st.pyplot(shap_fig)
     # st_shap_html = f"<head>{shap.getjs()}</head><body>{shap.save_html(None, shap_fig, return_html=True)}</body>"
     # st.components.v1.html(st_shap_html, height=300)
-
-
-# In[ ]:
-
 
 
 
