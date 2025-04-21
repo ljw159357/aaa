@@ -27,9 +27,9 @@ feature_ranges = {
 category_to_numeric_mapping = {
     "Transplant Side": {"Left": 1, "Right": 2, "Both": 0},
     "HBP": {"Yes": 1, "No": 0},
-    "Postoperative CRRT (Continuous Renal Replacement Therapy)": {"Yes": 1, "No": 0},
-    "Postoperative Anticoagulation": {"Yes": 1, "No": 0},
-    "Primary Graft Dysfunction (PGD, Level)": {"3": 3, "2": 2, "1": 1, "0": 0}
+    "post_CRRT": {"Yes": 1, "No": 0},
+    "post_anti": {"Yes": 1, "No": 0},
+    "PGD": {"3": 3, "2": 2, "1": 1, "0": 0}
 }
 
 # UI
