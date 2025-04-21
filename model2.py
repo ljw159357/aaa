@@ -97,4 +97,4 @@ if st.button("Predict"):
         matplotlib=True,
         show=False  # 不自动显示图形
     )
-    st.pyplot(shap_fig
+    st.pyplot(shap_fig)
