@@ -92,12 +92,12 @@ if st.button("Predict"):
     # explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
 
-    if len(explainer.expected_value) > 1:
-        base_value = explainer.expected_value[1]  # 类别 1 的基准值
-        shap_values_for_display = shap_values[0, :, 1]  # 类别 1 的 SHAP 值
+    if isinstance(explainer.expected_value, np.ndarray) and len(explainer.expected_value) > 1:
+        base_value = explainer.expected_value[1]
+        shap_values_for_display = shap_values[0, :, 1]
     else:
-        base_value = explainer.expected_value[0]  # 对于单一类别时使用基准值
-        shap_values_for_display = shap_values[0, :, 0]  # 类别 0 的 SHAP 值
+        base_value = explainer.expected_value  
+        shap_values_for_display = shap_values[0, :, 0]  
 
     shap.initjs()
     shap_fig = shap.plots.force(
