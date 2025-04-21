@@ -64,10 +64,7 @@ if numerical_values:
 
 features = np.array([feature_values])
 
-
-# In[3]:
-
-
+# 预测
 if st.button("Predict"):
     predicted_class = model.predict(features)[0]
     predicted_proba = model.predict_proba(features)[0]
@@ -99,10 +96,12 @@ if st.button("Predict"):
     # 如果模型有多个类，shap_values 是一个列表
     if isinstance(shap_values, list):
         shap_values = shap_values[1]  # 取类别 1 的 SHAP 值
+    else:
+        shap_values = shap_values[0]  # 对于二分类模型，shap_values 直接是一个数组
 
     shap_fig = shap.plots.force(
         explainer.expected_value[1],  # 类别 1 的基准值
-        shap_values[0],  # 类别 1 的 SHAP 值
+        shap_values,  # 类别 1 的 SHAP 值
         pd.DataFrame([feature_values], columns=feature_keys),
         matplotlib=True,
         show=False  # 不自动显示图形
