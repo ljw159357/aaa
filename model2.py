@@ -88,25 +88,28 @@ if st.button("Predict"):
 
     tree_model = get_tree_model(model)
     explainer = shap.TreeExplainer(tree_model)
+    
+    
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
-
-    shap.initjs()
-
-    # 确保获取正确的 SHAP 值并绘制图形
-    # 对于二分类问题，shap_values 会返回一个列表
-    # 如果是二分类问题，shap_values 是一个长度为 2 的列表
-    if isinstance(shap_values, list):
-        shap_values_class_1 = shap_values[1]  # 类别 1 的 SHAP 值
+    
+    if isinstance(shap_values, list) and len(shap_values) > 1:
+        shap_values_for_display = shap_values[1]  
+        base_value = explainer.expected_value[1]
+    elif isinstance(shap_values, list) and len(shap_values) == 1:
+        shap_values_for_display = shap_values[0]
+        base_value = explainer.expected_value[0]
     else:
-        shap_values_class_1 = shap_values  # 如果不是列表，直接使用
+        shap_values_for_display = shap_values
+        base_value = explainer.expected_value
 
-    # 使用类别 1 的 SHAP 值
+# 生成 SHAP 力图
+    shap.initjs()
     shap_fig = shap.plots.force(
-        explainer.expected_value[1],  # 类别 1 的基准值
-        shap_values_class_1[0],  # 类别 1 的 SHAP 值
+        base_value,  # 基准值
+        shap_values_for_display,  # SHAP 值
         pd.DataFrame([feature_values], columns=feature_keys),
         matplotlib=True,
         show=False  # 不自动显示图形
     )
-
+    
     st.pyplot(shap_fig)
