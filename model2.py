@@ -9,6 +9,20 @@ import shap
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 
+# 特征的缩写字典
+feature_abbr = {
+    "Postoperative Platelet Count (x10⁹/L)": "post_plt",
+    "Urgent Postoperative APTT (s)": "post_APTT_u",
+    "Day 1 Postoperative APTT (s)": "post_APTT_1",
+    "Day 1 Postoperative Antithrombin III Activity (%)": "post_antithrombin_III_1",
+    "Postoperative CRRT (Continuous Renal Replacement Therapy)": "post_CRRT",
+    "Postoperative Anticoagulation": "post_anticoagulation",
+    "Transplant Side": "trans_side",
+    "Primary Graft Dysfunction (PGD, Level)": "PGD",
+    "Height": "height",  # 其他特征也可以添加缩写
+    "HBP": "hbp"
+}
+
 # 加载模型
 model = joblib.load('xgb.pkl')
 scaler = StandardScaler()
@@ -102,12 +116,15 @@ if st.button("Predict"):
         shap_values_for_display = shap_values
         base_value = explainer.expected_value
 
-# 生成 SHAP 力图
+    # 将特征名替换为缩写
+    feature_keys_abbr = [feature_abbr.get(f, f) for f in feature_keys]  # 将特征名替换为缩写
+
+    # 生成 SHAP 力图
     shap.initjs()
     shap_fig = shap.plots.force(
         base_value,  # 基准值
         shap_values_for_display,  # SHAP 值
-        pd.DataFrame([feature_values], columns=feature_keys),
+        pd.DataFrame([feature_values], columns=feature_keys_abbr),  # 使用缩写作为列名
         matplotlib=True,
         show=False  # 不自动显示图形
     )
