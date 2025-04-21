@@ -8,104 +8,92 @@ from sklearn.preprocessing import StandardScaler
 
 # 加载模型
 model = joblib.load('xgb.pkl')
-scaler = StandardScaler()
 
-# 特征定义
+# 特征定义（保持原始特征名称）
 feature_ranges = {
-    "Height (cm)": {"type": "numerical"},
+    "Height": {"type": "numerical"},
     "HBP": {"type": "categorical", "options": ["Yes", "No"]},
-    "post_plt": {"type": "numerical"},
-    "post_APTT_u (s)": {"type": "numerical"},
-    "post_APTT_1 (s)": {"type": "numerical"},
-    "post_AIII(%)": {"type": "numerical"},
-    "post_CRRT": {"type": "categorical", "options": ["Yes", "No"]},
-    "post_anti": {"type": "categorical", "options": ["Yes", "No"]},
+    "Postoperative Platelet Count (x10⁹/L)": {"type": "numerical"},
+    "Urgent Postoperative APTT (s)": {"type": "numerical"},
+    "Day 1 Postoperative APTT (s)": {"type": "numerical"},
+    "Day 1 Postoperative Antithrombin III Activity (%)": {"type": "numerical"},
+    "Postoperative CRRT (Continuous Renal Replacement Therapy)": {"type": "categorical", "options": ["Yes", "No"]},
+    "Postoperative Anticoagulation": {"type": "categorical", "options": ["Yes", "No"]},
     "Transplant Side": {"type": "categorical", "options": ["Left", "Right", "Both"]},
-    "PGD": {"type": "categorical", "options": ["3", "2", "1", "0"]},
+    "Primary Graft Dysfunction (PGD, Level)": {"type": "categorical", "options": ["3", "2", "1", "0"]},
 }
 
 category_to_numeric_mapping = {
     "Transplant Side": {"Left": 1, "Right": 2, "Both": 0},
     "HBP": {"Yes": 1, "No": 0},
-    "post_CRRT": {"Yes": 1, "No": 0},
-    "post_anti": {"Yes": 1, "No": 0},
-    "PGD": {"3": 3, "2": 2, "1": 1, "0": 0}
+    "Postoperative CRRT (Continuous Renal Replacement Therapy)": {"Yes": 1, "No": 0},
+    "Postoperative Anticoagulation": {"Yes": 1, "No": 0},
+    "Primary Graft Dysfunction (PGD, Level)": {"3": 3, "2": 2, "1": 1, "0": 0}
 }
 
-# UI
-st.title("Prediction Model for Hemorrhage After Lung Transplantation")
+# UI界面
+st.title("Prediction Model for Thrombosis After Lung Transplantation")
 st.header("Enter the following feature values:")
 
 feature_values = []
+raw_values = []  # 保存原始值用于SHAP解释
 feature_keys = list(feature_ranges.keys())
 
-# 输入
+# 输入处理
 for feature in feature_keys:
     prop = feature_ranges[feature]
     if prop["type"] == "numerical":
         value = st.number_input(label=f"{feature}", value=0.0)
-        feature_values.append(value)
+        feature_values.append(float(value))
+        raw_values.append(value)  # 保存原始值
     elif prop["type"] == "categorical":
-        value = st.selectbox(label=f"{feature} (Select a value)", options=prop["options"], index=0)
+        value = st.selectbox(label=f"{feature}", options=prop["options"], index=0)
         numeric_value = category_to_numeric_mapping[feature][value]
         feature_values.append(numeric_value)
+        raw_values.append(value)  # 保存原始分类值
 
-# 数值特征标准化
-numerical_features = [f for f, p in feature_ranges.items() if p["type"] == "numerical"]
-numerical_values = [feature_values[feature_keys.index(f)] for f in numerical_features]
-
-if numerical_values:
-    numerical_values_scaled = scaler.fit_transform([numerical_values])
-    for idx, f in enumerate(numerical_features):
-        feature_values[feature_keys.index(f)] = numerical_values_scaled[0][idx]
-
-features = np.array([feature_values])
-
+# 模型预测和解释
 if st.button("Predict"):
-    predicted_class = model.predict(features)[0]
-    predicted_proba = model.predict_proba(features)[0]
-    probability = predicted_proba[predicted_class] * 100
+    # 转换特征格式
+    features_df = pd.DataFrame([feature_values], columns=feature_keys)
+    
+    # 获取预测结果
+    predicted_class = model.predict(features_df)[0]
+    predicted_proba = model.predict_proba(features_df)[0]
+    probability = predicted_proba[1] * 100  # 直接获取类别1的概率
 
     # 显示预测结果
-    text = f"Based on feature values, predicted possibility of hemorrhage after lung transplantation is {probability:.2f}%"
+    result_text = f"Predicted probability of thrombosis after lung transplantation: {probability:.2f}%"
     fig, ax = plt.subplots(figsize=(8, 1))
-    ax.text(0.5, 0.5, text, fontsize=16, ha='center', va='center', fontname='Times New Roman', transform=ax.transAxes)
+    ax.text(0.5, 0.5, result_text, fontsize=16, ha='center', va='center', 
+            fontname='Times New Roman', transform=ax.transAxes)
     ax.axis('off')
-    plt.savefig("prediction_text.png", bbox_inches='tight', dpi=300)
-    st.image("prediction_text.png")
+    st.pyplot(fig)
 
-    # SHAP 解释
-    # 提取底层模型（支持 pipeline 或直接模型）
-    def get_tree_model(model):
+    # SHAP解释
+    def get_model_from_pipeline(model):
         from sklearn.pipeline import Pipeline
-        if isinstance(model, Pipeline):
-            return model.named_steps['clf']
-        return model
+        return model.named_steps['clf'] if isinstance(model, Pipeline) else model
 
-    tree_model = get_tree_model(model)
-    explainer = shap.TreeExplainer(tree_model)
+    explainer = shap.TreeExplainer(get_model_from_pipeline(model))
+    shap_values = explainer.shap_values(features_df)
     
-    shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
-    if isinstance(shap_values, list) and len(shap_values) > 1:
-        shap_values_for_display = shap_values[1]  
-        base_value = explainer.expected_value[1]  
-    elif isinstance(shap_values, list) and len(shap_values) == 1:
-        # 如果只有一个类别，取该类别的 SHAP 值并处理
-        shap_values_for_display = shap_values[0]
-        base_value = explainer.expected_value[0]
-    else:
-    # 如果是回归问题或者其他情况，只返回默认的 SHAP 值
-        shap_values_for_display = shap_values
-        base_value = explainer.expected_value
-        
-        shap.initjs()
-        shap_fig = shap.plots.force(
-            base_value,  # 基准值
-            shap_values_for_display,  # SHAP 值
-            pd.DataFrame([feature_values], columns=feature_keys),
-            matplotlib=True,
-            show=False  # 不自动显示图形
-        )
-        
-        st.pyplot(shap_fig)
+    # 创建特征名称映射（显示原始值）
+    formatted_features = []
+    for f, v in zip(feature_keys, raw_values):
+        if feature_ranges[f]["type"] == "categorical":
+            formatted_features.append(f"{f} = {v}")
+        else:
+            formatted_features.append(f"{f} = {v:.2f}")
 
+    # 绘制SHAP力图
+    plt.figure()
+    shap.force_plot(
+        base_value=explainer.expected_value[1],
+        shap_values=shap_values[1][0, :],  # 类别1的SHAP值
+        features=features_df.iloc[0],
+        feature_names=formatted_features,  # 使用带原始值的特征名称
+        matplotlib=True,
+        show=False
+    )
+    st.pyplot(plt.gcf())
