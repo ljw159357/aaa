@@ -14,14 +14,14 @@ scaler = StandardScaler()
 feature_ranges = {
     "Height (cm)": {"type": "numerical"},
     "HBP": {"type": "categorical", "options": ["Yes", "No"]},
-    "Postoperative Platelet Count (x10⁹/L)": {"type": "numerical"},
-    "Urgent Postoperative APTT (s)": {"type": "numerical"},
-    "Day 1 Postoperative APTT (s)": {"type": "numerical"},
-    "Day 1 Postoperative Antithrombin III Activity (%)": {"type": "numerical"},
-    "Postoperative CRRT (Continuous Renal Replacement Therapy)": {"type": "categorical", "options": ["Yes", "No"]},
-    "Postoperative Anticoagulation": {"type": "categorical", "options": ["Yes", "No"]},
+    "post_plt": {"type": "numerical"},
+    "post_APTT_u (s)": {"type": "numerical"},
+    "post_APTT_1 (s)": {"type": "numerical"},
+    "post_AIII(%)": {"type": "numerical"},
+    "post_CRRT": {"type": "categorical", "options": ["Yes", "No"]},
+    "post_anti": {"type": "categorical", "options": ["Yes", "No"]},
     "Transplant Side": {"type": "categorical", "options": ["Left", "Right", "Both"]},
-    "Primary Graft Dysfunction (PGD, Level)": {"type": "categorical", "options": ["3", "2", "1", "0"]},
+    "PGD": {"type": "categorical", "options": ["3", "2", "1", "0"]},
 }
 
 category_to_numeric_mapping = {
