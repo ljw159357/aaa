@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import streamlit as st
 import joblib
 import numpy as np
@@ -11,10 +5,6 @@ import pandas as pd
 import shap
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-
-
-# In[2]:
-
 
 # 加载模型
 model = joblib.load('xgb.pkl')
@@ -98,33 +88,28 @@ if st.button("Predict"):
 
     tree_model = get_tree_model(model)
     explainer = shap.TreeExplainer(tree_model)
-    # explainer = shap.TreeExplainer(model)
+    
+    # SHAP 值计算
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
 
     shap.initjs()
-    shap_fig = shap.plots.force(
-        explainer.expected_value[1],  # 类别 1 的基准值
-        shap_values[0, :, 1],  # 类别 1 的 SHAP 值
-        pd.DataFrame([feature_values], columns=feature_keys),
-        # feature_names=features_adult_en,  # 特征名称
-        matplotlib=True,
-        show=False  # 不自动显示图形
-    )
-    # shap_fig = shap.plots.force(
-    #     # explainer.expected_value[predicted_class],
-    #     # shap_values[predicted_class],
-    #     expected_value,
-    #     shap_values_for_display,
-    #     pd.DataFrame([feature_values], columns=feature_keys),
-    #     matplotlib=True
-    # )
+
+    # 修改 SHAP 图的处理
+    if isinstance(shap_values, list):  # 如果有多个类别
+        shap_fig = shap.plots.force(
+            explainer.expected_value[1],  # 类别 1 的基准值
+            shap_values[1],  # 获取类别 1 的 SHAP 值
+            pd.DataFrame([feature_values], columns=feature_keys),
+            matplotlib=True,
+            show=False
+        )
+    else:  # 单一类别
+        shap_fig = shap.plots.force(
+            explainer.expected_value,  # 获取基准值
+            shap_values,  # 获取 SHAP 值
+            pd.DataFrame([feature_values], columns=feature_keys),
+            matplotlib=True,
+            show=False
+        )
+        
     st.pyplot(shap_fig)
-    # st_shap_html = f"<head>{shap.getjs()}</head><body>{shap.save_html(None, shap_fig, return_html=True)}</body>"
-    # st.components.v1.html(st_shap_html, height=300)
-
-
-# In[ ]:
-
-
-
-
