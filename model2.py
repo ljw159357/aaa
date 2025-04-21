@@ -122,12 +122,16 @@ if st.button("Predict"):
     else:
         shap_values_class = shap_values  # 二分类问题中直接使用
 
-    shap_fig = shap.plots.force(
-        explainer.expected_value[1],  # 类别 1 的基准值
-        shap_values_class[0],  # 类别 1 的 SHAP 值
-        pd.DataFrame([feature_values], columns=feature_names_abbr),  # 使用缩写名称
-        matplotlib=True,
-        show=False  # 不自动显示图形
-    )
+    # 防止对标量进行索引，确保shap_values_class正确索引
+    if isinstance(shap_values_class, np.ndarray):
+        shap_fig = shap.plots.force(
+            explainer.expected_value[1],  # 类别 1 的基准值
+            shap_values_class[0],  # 类别 1 的 SHAP 值
+            pd.DataFrame([feature_values], columns=feature_names_abbr),  # 使用缩写名称
+            matplotlib=True,
+            show=False  # 不自动显示图形
+        )
+    else:
+        st.error("Invalid SHAP values format.")
 
     st.pyplot(shap_fig)
