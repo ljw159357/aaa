@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 import streamlit as st
 import joblib
 import numpy as np
@@ -8,7 +11,6 @@ from sklearn.preprocessing import StandardScaler
 
 # 加载模型
 model = joblib.load('xgb.pkl')
-scaler = StandardScaler()
 
 # 特征定义
 feature_ranges = {
@@ -30,6 +32,20 @@ category_to_numeric_mapping = {
     "Postoperative CRRT (Continuous Renal Replacement Therapy)": {"Yes": 1, "No": 0},
     "Postoperative Anticoagulation": {"Yes": 1, "No": 0},
     "Primary Graft Dysfunction (PGD, Level)": {"3": 3, "2": 2, "1": 1, "0": 0}
+}
+
+# 定义特征的缩写
+feature_abbr = {
+    "Postoperative Platelet Count (x10⁹/L)": "post_plt",
+    "Urgent Postoperative APTT (s)": "post_APTT_u",
+    "Day 1 Postoperative APTT (s)": "post_APTT_1",
+    "Day 1 Postoperative Antithrombin III Activity (%)": "post_antithrombin_III_1",
+    "Postoperative CRRT (Continuous Renal Replacement Therapy)": "post_CRRT",
+    "Postoperative Anticoagulation": "post_anticoagulation",
+    "Transplant Side": "trans_side",
+    "Primary Graft Dysfunction (PGD, Level)": "PGD",
+    "Height": "height",  # 其他特征也可以添加缩写
+    "HBP": "hbp"
 }
 
 # UI
@@ -54,8 +70,12 @@ for feature in feature_keys:
 numerical_features = [f for f, p in feature_ranges.items() if p["type"] == "numerical"]
 numerical_values = [feature_values[feature_keys.index(f)] for f in numerical_features]
 
+# 创建一个标准化器
+scaler = StandardScaler()
+
 if numerical_values:
-    numerical_values_scaled = scaler.fit_transform([numerical_values])
+    # 使用新的标准化器进行拟合并转换数值特征
+    numerical_values_scaled = scaler.fit_transform([numerical_values])  # 使用fit_transform进行标准化
     for idx, f in enumerate(numerical_features):
         feature_values[feature_keys.index(f)] = numerical_values_scaled[0][idx]
 
@@ -88,28 +108,24 @@ if st.button("Predict"):
 
     tree_model = get_tree_model(model)
     explainer = shap.TreeExplainer(tree_model)
-    
-    # SHAP 值计算
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
 
     shap.initjs()
 
-    # 修改 SHAP 图的处理
-    if isinstance(shap_values, list):  # 如果有多个类别
-        shap_fig = shap.plots.force(
-            explainer.expected_value[1],  # 类别 1 的基准值
-            shap_values[1],  # 获取类别 1 的 SHAP 值
-            pd.DataFrame([feature_values], columns=feature_keys),
-            matplotlib=True,
-            show=False
-        )
-    else:  # 单一类别
-        shap_fig = shap.plots.force(
-            explainer.expected_value,  # 获取基准值
-            shap_values,  # 获取 SHAP 值
-            pd.DataFrame([feature_values], columns=feature_keys),
-            matplotlib=True,
-            show=False
-        )
-        
+    # 获取缩写特征名列表
+    feature_names_abbr = [feature_abbr.get(f, f) for f in feature_keys]  # 用缩写替换特征名
+
+    # 确保获取正确的 SHAP 值并绘制图形
+    # 如果模型有多个类，shap_values 是一个列表
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1]  # 取类别 1 的 SHAP 值
+
+    shap_fig = shap.plots.force(
+        explainer.expected_value[1],  # 类别 1 的基准值
+        shap_values[0],  # 类别 1 的 SHAP 值
+        pd.DataFrame([feature_values], columns=feature_names_abbr),  # 使用缩写名称
+        matplotlib=True,
+        show=False  # 不自动显示图形
+    )
+
     st.pyplot(shap_fig)
