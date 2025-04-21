@@ -12,7 +12,7 @@ scaler = StandardScaler()
 
 # 特征定义
 feature_ranges = {
-    "Height": {"type": "numerical"},
+    "Height (cm)": {"type": "numerical"},
     "HBP": {"type": "categorical", "options": ["Yes", "No"]},
     "Postoperative Platelet Count (x10⁹/L)": {"type": "numerical"},
     "Urgent Postoperative APTT (s)": {"type": "numerical"},
@@ -33,7 +33,7 @@ category_to_numeric_mapping = {
 }
 
 # UI
-st.title("Prediction Model for Thrombosis After Lung Transplantation")
+st.title("Prediction Model for Hemorrhage After Lung Transplantation")
 st.header("Enter the following feature values:")
 
 feature_values = []
@@ -88,29 +88,26 @@ if st.button("Predict"):
 
     tree_model = get_tree_model(model)
     explainer = shap.TreeExplainer(tree_model)
+    
     # explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
 
+    if len(explainer.expected_value) > 1:
+        base_value = explainer.expected_value[1]  # 类别 1 的基准值
+        shap_values_for_display = shap_values[0, :, 1]  # 类别 1 的 SHAP 值
+    else:
+        base_value = explainer.expected_value[0]  # 对于单一类别时使用基准值
+        shap_values_for_display = shap_values[0, :, 0]  # 类别 0 的 SHAP 值
+
     shap.initjs()
     shap_fig = shap.plots.force(
-        explainer.expected_value[1],  # 类别 1 的基准值
-        shap_values[0, :, 1],  # 类别 1 的 SHAP 值
+        base_value,  # 基准值
+        shap_values_for_display,  # SHAP 值
         pd.DataFrame([feature_values], columns=feature_keys),
-        # feature_names=features_adult_en,  # 特征名称
         matplotlib=True,
         show=False  # 不自动显示图形
     )
-    # shap_fig = shap.plots.force(
-    #     # explainer.expected_value[predicted_class],
-    #     # shap_values[predicted_class],
-    #     expected_value,
-    #     shap_values_for_display,
-    #     pd.DataFrame([feature_values], columns=feature_keys),
-    #     matplotlib=True
-    # )
-    st.pyplot(shap_fig)
-    # st_shap_html = f"<head>{shap.getjs()}</head><body>{shap.save_html(None, shap_fig, return_html=True)}</body>"
-    # st.components.v1.html(st_shap_html, height=300)
 
+    st.pyplot(shap_fig)
 
 
