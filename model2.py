@@ -61,10 +61,6 @@ if numerical_values:
 
 features = np.array([feature_values])
 
-
-# In[3]:
-
-
 if st.button("Predict"):
     predicted_class = model.predict(features)[0]
     predicted_proba = model.predict_proba(features)[0]
@@ -89,15 +85,20 @@ if st.button("Predict"):
     tree_model = get_tree_model(model)
     explainer = shap.TreeExplainer(tree_model)
     
-    # explainer = shap.TreeExplainer(model)
+    # 获取 SHAP 值
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
 
-    if isinstance(explainer.expected_value, np.ndarray) and len(explainer.expected_value) > 1:
-        base_value = explainer.expected_value[1]
-        shap_values_for_display = shap_values[0, :, 1]
+    # 修正：确保 explainer.expected_value 是否为标量，避免使用 len() 出错
+    if isinstance(explainer.expected_value, np.ndarray):
+        if len(explainer.expected_value) > 1:
+            base_value = explainer.expected_value[1]  # 类别 1 的基准值
+            shap_values_for_display = shap_values[0, :, 1]  # 类别 1 的 SHAP 值
+        else:
+            base_value = explainer.expected_value[0]  # 对于单一类别时使用基准值
+            shap_values_for_display = shap_values[0, :, 0]  # 类别 0 的 SHAP 值
     else:
-        base_value = explainer.expected_value  
-        shap_values_for_display = shap_values[0, :, 0]  
+        base_value = explainer.expected_value  # 如果是标量值，直接使用它
+        shap_values_for_display = shap_values[0, :]  # 如果是标量，则选择第一个样本的所有特征 SHAP 值
 
     shap.initjs()
     shap_fig = shap.plots.force(
@@ -109,5 +110,3 @@ if st.button("Predict"):
     )
 
     st.pyplot(shap_fig)
-
-
