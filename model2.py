@@ -93,15 +93,17 @@ if st.button("Predict"):
     shap.initjs()
 
     # 确保获取正确的 SHAP 值并绘制图形
-    # 如果模型有多个类，shap_values 是一个列表
+    # 对于二分类问题，shap_values 会返回一个列表
+    # 如果是二分类问题，shap_values 是一个长度为 2 的列表
     if isinstance(shap_values, list):
-        shap_values = shap_values[1]  # 取类别 1 的 SHAP 值
+        shap_values_class_1 = shap_values[1]  # 类别 1 的 SHAP 值
     else:
-        shap_values = shap_values[0]  # 对于二分类模型，shap_values 直接是一个数组
+        shap_values_class_1 = shap_values  # 如果不是列表，直接使用
 
+    # 使用类别 1 的 SHAP 值
     shap_fig = shap.plots.force(
         explainer.expected_value[1],  # 类别 1 的基准值
-        shap_values,  # 类别 1 的 SHAP 值
+        shap_values_class_1[0],  # 类别 1 的 SHAP 值
         pd.DataFrame([feature_values], columns=feature_keys),
         matplotlib=True,
         show=False  # 不自动显示图形
