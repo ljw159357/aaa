@@ -115,14 +115,16 @@ if st.button("Predict"):
     # 获取缩写特征名列表
     feature_names_abbr = [feature_abbr.get(f, f) for f in feature_keys]  # 用缩写替换特征名
 
-    # 确保获取正确的 SHAP 值并绘制图形
-    # 如果模型有多个类，shap_values 是一个列表
+    # 处理 SHAP 输出
     if isinstance(shap_values, list):
-        shap_values = shap_values[1]  # 取类别 1 的 SHAP 值
+        # 如果有多个类别，选择目标类别（例如类别1）
+        shap_values_class = shap_values[1]  # 类别 1 的 SHAP 值
+    else:
+        shap_values_class = shap_values  # 二分类问题中直接使用
 
     shap_fig = shap.plots.force(
         explainer.expected_value[1],  # 类别 1 的基准值
-        shap_values[0],  # 类别 1 的 SHAP 值
+        shap_values_class[0],  # 类别 1 的 SHAP 值
         pd.DataFrame([feature_values], columns=feature_names_abbr),  # 使用缩写名称
         matplotlib=True,
         show=False  # 不自动显示图形
