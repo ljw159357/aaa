@@ -87,26 +87,14 @@ if st.button("Predict"):
     
     # 获取 SHAP 值
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
-
-    # 修正：确保 explainer.expected_value 是否为标量，避免使用 len() 出错
-    if isinstance(explainer.expected_value, np.ndarray):
-        if len(explainer.expected_value) > 1:
-            base_value = explainer.expected_value[1]  # 类别 1 的基准值
-            shap_values_for_display = shap_values[0, :, 1]  # 类别 1 的 SHAP 值
-        else:
-            base_value = explainer.expected_value[0]  # 对于单一类别时使用基准值
-            shap_values_for_display = shap_values[0, :, 0]  # 类别 0 的 SHAP 值
-    else:
-        base_value = explainer.expected_value  # 如果是标量值，直接使用它
-        shap_values_for_display = shap_values[0, :]  # 如果是标量，则选择第一个样本的所有特征 SHAP 值
-
+    shap_values_for_display = shap_values[1]  # 类别 1 的 SHAP 值
+    base_value = explainer.expected_value[1]  # 类别 1 的基准值
     shap.initjs()
     shap_fig = shap.plots.force(
         base_value,  # 基准值
-        shap_values_for_display,  # SHAP 值
+        shap_values_for_display,  # 类别 1 的 SHAP 值
         pd.DataFrame([feature_values], columns=feature_keys),
         matplotlib=True,
         show=False  # 不自动显示图形
     )
-
-    st.pyplot(shap_fig)
+    st.pyplot(shap_fig
