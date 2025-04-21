@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 import streamlit as st
 import joblib
 import numpy as np
@@ -57,14 +54,18 @@ for feature in feature_keys:
 numerical_features = [f for f, p in feature_ranges.items() if p["type"] == "numerical"]
 numerical_values = [feature_values[feature_keys.index(f)] for f in numerical_features]
 
+# 训练时已拟合的标准化器，使用 transform 进行标准化
 if numerical_values:
-    numerical_values_scaled = scaler.fit_transform([numerical_values])
+    numerical_values_scaled = scaler.transform([numerical_values])  # 使用 transform 进行标准化
     for idx, f in enumerate(numerical_features):
         feature_values[feature_keys.index(f)] = numerical_values_scaled[0][idx]
 
 features = np.array([feature_values])
 
-# 预测
+
+# In[3]:
+
+
 if st.button("Predict"):
     predicted_class = model.predict(features)[0]
     predicted_proba = model.predict_proba(features)[0]
@@ -89,27 +90,27 @@ if st.button("Predict"):
     tree_model = get_tree_model(model)
     explainer = shap.TreeExplainer(tree_model)
     
-    
+    # SHAP 值计算
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
-    
-    if isinstance(shap_values, list) and len(shap_values) > 1:
-        shap_values_for_display = shap_values[1]  
-        base_value = explainer.expected_value[1]
-    elif isinstance(shap_values, list) and len(shap_values) == 1:
-        shap_values_for_display = shap_values[0]
-        base_value = explainer.expected_value[0]
-    else:
-        shap_values_for_display = shap_values
-        base_value = explainer.expected_value
 
-# 生成 SHAP 力图
     shap.initjs()
-    shap_fig = shap.plots.force(
-        base_value,  # 基准值
-        shap_values_for_display,  # SHAP 值
-        pd.DataFrame([feature_values], columns=feature_keys),
-        matplotlib=True,
-        show=False  # 不自动显示图形
-    )
-    
+
+    # 修改 SHAP 图的处理
+    if isinstance(shap_values, list):  # 如果有多个类别
+        shap_fig = shap.plots.force(
+            explainer.expected_value[1],  # 类别 1 的基准值
+            shap_values[1],  # 获取类别 1 的 SHAP 值
+            pd.DataFrame([feature_values], columns=feature_keys),
+            matplotlib=True,
+            show=False
+        )
+    else:  # 单一类别
+        shap_fig = shap.plots.force(
+            explainer.expected_value,  # 获取基准值
+            shap_values,  # 获取 SHAP 值
+            pd.DataFrame([feature_values], columns=feature_keys),
+            matplotlib=True,
+            show=False
+        )
+        
     st.pyplot(shap_fig)
