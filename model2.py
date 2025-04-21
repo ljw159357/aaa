@@ -35,20 +35,6 @@ category_to_numeric_mapping = {
     "Primary Graft Dysfunction (PGD, Level)": {"3": 3, "2": 2, "1": 1, "0": 0}
 }
 
-# 定义特征的缩写
-feature_abbr = {
-    "Postoperative Platelet Count (x10⁹/L)": "post_plt",
-    "Urgent Postoperative APTT (s)": "post_APTT_u",
-    "Day 1 Postoperative APTT (s)": "post_APTT_1",
-    "Day 1 Postoperative Antithrombin III Activity (%)": "post_antithrombin_III_1",
-    "Postoperative CRRT (Continuous Renal Replacement Therapy)": "post_CRRT",
-    "Postoperative Anticoagulation": "post_anticoagulation",
-    "Transplant Side": "trans_side",
-    "Primary Graft Dysfunction (PGD, Level)": "PGD",
-    "Height": "height",  # 其他特征也可以添加缩写
-    "HBP": "hbp"
-}
-
 # UI
 st.title("Prediction Model for Thrombosis After Lung Transplantation")
 st.header("Enter the following feature values:")
@@ -109,26 +95,17 @@ if st.button("Predict"):
 
     shap.initjs()
 
-    # 获取缩写特征名列表
-    feature_names_abbr = [feature_abbr.get(f, f) for f in feature_keys]  # 用缩写替换特征名
-
-    # 处理 SHAP 输出
+    # 确保获取正确的 SHAP 值并绘制图形
+    # 如果模型有多个类，shap_values 是一个列表
     if isinstance(shap_values, list):
-        # 如果有多个类别，选择目标类别（例如类别1）
-        shap_values_class = shap_values[1]  # 类别 1 的 SHAP 值
-    else:
-        shap_values_class = shap_values  # 二分类问题中直接使用
+        shap_values = shap_values[1]  # 取类别 1 的 SHAP 值
 
-    # 防止对标量进行索引，确保shap_values_class正确索引
-    if isinstance(shap_values_class, np.ndarray):
-        shap_fig = shap.plots.force(
-            explainer.expected_value[1],  # 类别 1 的基准值
-            shap_values_class[0],  # 类别 1 的 SHAP 值
-            pd.DataFrame([feature_values], columns=feature_names_abbr),  # 使用缩写名称
-            matplotlib=True,
-            show=False  # 不自动显示图形
-        )
-    else:
-        st.error("Invalid SHAP values format.")
+    shap_fig = shap.plots.force(
+        explainer.expected_value[1],  # 类别 1 的基准值
+        shap_values[0],  # 类别 1 的 SHAP 值
+        pd.DataFrame([feature_values], columns=feature_keys),
+        matplotlib=True,
+        show=False  # 不自动显示图形
+    )
 
     st.pyplot(shap_fig)
