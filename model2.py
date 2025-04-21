@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 
 # 加载模型
 model = joblib.load('xgb.pkl')
+scaler = StandardScaler()
 
 # 特征定义
 feature_ranges = {
@@ -70,12 +71,8 @@ for feature in feature_keys:
 numerical_features = [f for f, p in feature_ranges.items() if p["type"] == "numerical"]
 numerical_values = [feature_values[feature_keys.index(f)] for f in numerical_features]
 
-# 创建一个标准化器
-scaler = StandardScaler()
-
 if numerical_values:
-    # 使用新的标准化器进行拟合并转换数值特征
-    numerical_values_scaled = scaler.fit_transform([numerical_values])  # 使用fit_transform进行标准化
+    numerical_values_scaled = scaler.fit_transform([numerical_values])
     for idx, f in enumerate(numerical_features):
         feature_values[feature_keys.index(f)] = numerical_values_scaled[0][idx]
 
