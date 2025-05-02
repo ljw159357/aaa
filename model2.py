@@ -9,20 +9,6 @@ import shap
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 
-# 特征的缩写字典
-feature_abbr = {
-    "Postoperative Platelet Count (x10⁹/L)": "post_plt",
-    "Urgent Postoperative APTT (s)": "post_APTT_u",
-    "Day 1 Postoperative APTT (s)": "post_APTT_1",
-    "Day 1 Postoperative Antithrombin III Activity (%)": "post_antithrombin_III_1",
-    "Postoperative CRRT (Continuous Renal Replacement Therapy)": "post_CRRT",
-    "Postoperative Anticoagulation": "post_anticoagulation",
-    "Transplant Side": "trans_side",
-    "Primary Graft Dysfunction (PGD, Level)": "PGD",
-    "Height": "height",  # 其他特征也可以添加缩写
-    "HBP": "hbp"
-}
-
 # 加载模型
 model = joblib.load('xgb.pkl')
 scaler = StandardScaler()
@@ -78,7 +64,7 @@ if numerical_values:
 
 features = np.array([feature_values])
 
-# 预测
+# 预测按钮
 if st.button("Predict"):
     predicted_class = model.predict(features)[0]
     predicted_proba = model.predict_proba(features)[0]
@@ -103,30 +89,21 @@ if st.button("Predict"):
     tree_model = get_tree_model(model)
     explainer = shap.TreeExplainer(tree_model)
     
-    
+    # 获取SHAP值
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
-    
-    if isinstance(shap_values, list) and len(shap_values) > 1:
-        shap_values_for_display = shap_values[1]  
-        base_value = explainer.expected_value[1]
-    elif isinstance(shap_values, list) and len(shap_values) == 1:
-        shap_values_for_display = shap_values[0]
-        base_value = explainer.expected_value[0]
-    else:
-        shap_values_for_display = shap_values
-        base_value = explainer.expected_value
 
-    # 将特征名替换为缩写
-    feature_keys_abbr = [feature_abbr.get(f, f) for f in feature_keys]  # 将特征名替换为缩写
+    # SHAP力图
+    predicted_class = model.predict(features)[0]  # 重新计算预测类别
+    expected_value = explainer.expected_value[predicted_class]  # 获取对应类别的基准值
+    shap_values_for_display = shap_values[predicted_class]  # 对应类别的SHAP值
 
-    # 生成 SHAP 力图
-    shap.initjs()
+    shap.initjs()  # 初始化shap的js
     shap_fig = shap.plots.force(
-        base_value,  # 基准值
-        shap_values_for_display,  # SHAP 值
-        pd.DataFrame([feature_values], columns=feature_keys_abbr),  # 使用缩写作为列名
+        expected_value,  # 预测类别的基准值
+        shap_values_for_display,  # 预测类别的SHAP值
+        pd.DataFrame([feature_values], columns=feature_keys),
         matplotlib=True,
         show=False  # 不自动显示图形
     )
-    
-    st.pyplot(shap_fig)
+
+    st.pyplot(shap_fig)  # 显示SHAP力图
