@@ -52,6 +52,10 @@ if st.button("Predict"):
 
     # 显示预测结果
     text = f"Based on feature values, predicted possibility of hemorrhage after lung transplantation is {probability:.2f}%"
+    
+    # 强制转换为字符串
+    text = str(text)
+    
     fig, ax = plt.subplots(figsize=(8, 1))
     ax.text(0.5, 0.5, text, fontsize=16, ha='center', va='center', fontname='Times New Roman', transform=ax.transAxes)
     ax.axis('off')
