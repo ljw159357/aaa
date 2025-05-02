@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 import streamlit as st
 import joblib
 import numpy as np
@@ -14,15 +11,15 @@ model = joblib.load('xgb.pkl')
 # 特征定义
 feature_ranges = {
     "Height": {"type": "numerical"},
-    "HBP": {"type": "categorical", "options": ["1", "0"]},  # 1 和 0
+    "HBP": {"type": "categorical", "options": ["1", "0"]},
     "Postoperative Platelet Count (x10⁹/L)": {"type": "numerical"},
     "Urgent Postoperative APTT (s)": {"type": "numerical"},
     "Day 1 Postoperative APTT (s)": {"type": "numerical"},
     "Day 1 Postoperative Antithrombin III Activity (%)": {"type": "numerical"},
-    "Postoperative CRRT (Continuous Renal Replacement Therapy)": {"type": "categorical", "options": ["1", "0"]},  # 1 和 0
-    "Postoperative Anticoagulation": {"type": "categorical", "options": ["1", "0"]},  # 1 和 0
-    "Transplant Side": {"type": "categorical", "options": ["1", "2", "0"]},  # 1, 2, 0
-    "Primary Graft Dysfunction (PGD, Level)": {"type": "categorical", "options": ["3", "2", "1", "0"]},  # 3, 2, 1, 0
+    "Postoperative CRRT (Continuous Renal Replacement Therapy)": {"type": "categorical", "options": ["1", "0"]},
+    "Postoperative Anticoagulation": {"type": "categorical", "options": ["1", "0"]},
+    "Transplant Side": {"type": "categorical", "options": ["1", "2", "0"]},
+    "Primary Graft Dysfunction (PGD, Level)": {"type": "categorical", "options": ["3", "2", "1", "0"]},
 }
 
 # UI
@@ -40,7 +37,7 @@ for feature in feature_keys:
         feature_values.append(value)
     elif prop["type"] == "categorical":
         value = st.selectbox(label=f"{feature} (Select a value)", options=prop["options"], index=0)
-        feature_values.append(int(value))  # 将分类输入直接转化为整数（例如 "1" -> 1）
+        feature_values.append(int(value))  # 将分类输入直接转化为整数
 
 features = np.array([feature_values])
 
@@ -52,44 +49,34 @@ if st.button("Predict"):
 
     # 显示预测结果
     text = f"Based on feature values, predicted possibility of hemorrhage after lung transplantation is {probability:.2f}%"
-    
-    # 强制转换为字符串
-    text = str(text)
-    
     fig, ax = plt.subplots(figsize=(8, 1))
-    ax.text(0.5, 0.5, text, fontsize=16, ha='center', va='center', fontname='Times New Roman', transform=ax.transAxes)
+    ax.text(0.5, 0.5, text, fontsize=16, ha='center', va='center', transform=ax.transAxes)  # 移除 fontname，避免字体问题
     ax.axis('off')
     plt.savefig("prediction_text.png", bbox_inches='tight', dpi=300)
     st.image("prediction_text.png")
 
     # SHAP 解释
-    # 提取底层模型（支持 pipeline 或直接模型）
-    def get_tree_model(model):
-        from sklearn.pipeline import Pipeline
-        if isinstance(model, Pipeline):
-            return model.named_steps['clf']
-        return model
-
-    tree_model = get_tree_model(model)
-    explainer = shap.TreeExplainer(tree_model)
+    explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
 
     shap.initjs()
 
-    # 更新：修正 SHAP 值的索引
+    # 根据 SHAP 值类型调整访问方式
     if isinstance(shap_values, list):
-        # 多分类问题，shap_values 为 list，分别对应每个类别的 SHAP 值
+        # 多分类问题
         shap_values_for_class = shap_values[1]  # 选择类别 1 的 SHAP 值
+        expected_value = explainer.expected_value[1]
     else:
-        # 二分类问题，shap_values 是一个 ndarray
-        shap_values_for_class = shap_values[:, :, 1]  # 获取类别 1 的 SHAP 值
+        # 二分类问题
+        shap_values_for_class = shap_values  # 直接使用 shap_values
+        expected_value = explainer.expected_value
 
-    shap_fig = shap.plots.force(
-        explainer.expected_value[1],  # 类别 1 的基准值
-        shap_values_for_class[0, :],  # 类别 1 的 SHAP 值
+    shap_fig = shap.force_plot(
+        expected_value,  # 基准值
+        shap_values_for_class[0],  # 第一个样本的 SHAP 值
         pd.DataFrame([feature_values], columns=feature_keys),
         matplotlib=True,
-        show=False  # 不自动显示图形
+        show=False
     )
 
     st.pyplot(shap_fig)
