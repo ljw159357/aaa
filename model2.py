@@ -75,9 +75,18 @@ if st.button("Predict"):
     shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_keys))
 
     shap.initjs()
+
+    # 更新：修正 SHAP 值的索引
+    if isinstance(shap_values, list):
+        # 多分类问题，shap_values 为 list，分别对应每个类别的 SHAP 值
+        shap_values_for_class = shap_values[1]  # 选择类别 1 的 SHAP 值
+    else:
+        # 二分类问题，shap_values 是一个 ndarray
+        shap_values_for_class = shap_values[:, :, 1]  # 获取类别 1 的 SHAP 值
+
     shap_fig = shap.plots.force(
         explainer.expected_value[1],  # 类别 1 的基准值
-        shap_values[0, :, 1],  # 类别 1 的 SHAP 值
+        shap_values_for_class[0, :],  # 类别 1 的 SHAP 值
         pd.DataFrame([feature_values], columns=feature_keys),
         matplotlib=True,
         show=False  # 不自动显示图形
