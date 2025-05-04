@@ -50,7 +50,7 @@ category_to_numeric_mapping = {
 }
 
 # UI
-st.header("Prediction Model for Thrombosis After Lung Transplantation")
+st.header("Prediction Model for Hemorrhage After Lung Transplantation")
 st.write("Enter the following feature values:")
 
 feature_values = []
