@@ -1,8 +1,9 @@
-import io, tempfile, os, base64
+import io
 import streamlit as st
-import streamlit.components.v1 as components
-import joblib, pandas as pd
-import shap, matplotlib.pyplot as plt
+import joblib
+import pandas as pd
+import shap
+import matplotlib.pyplot as plt
 from sklearn.pipeline import Pipeline
 
 # --------------------------------------------------
@@ -27,7 +28,8 @@ feature_defs = {
 }
 
 # --------------------------------------------------
-# Display‑name → Internal‑name 映射（务必与训练一致）
+# 1) Display‑name  →  Internal‑name 映射
+#    **务必与训练阶段保持完全一致！**
 # --------------------------------------------------
 rename_cols = {
     "Height": "height",
@@ -43,7 +45,7 @@ rename_cols = {
 }
 
 # --------------------------------------------------
-# 类别值映射（键用内部列名）
+# 2) 类别取值映射（键用内部列名）
 # --------------------------------------------------
 categorical_mapping_internal = {
     "HBP": {"Yes": 1, "No": 0},
@@ -53,12 +55,12 @@ categorical_mapping_internal = {
     "PGD": {"3": 3, "2": 2, "1": 1, "0": 0},
 }
 
-# --------------------------------------------------
-# Lists of columns
-# --------------------------------------------------
-numerical_cols_display    = [k for k, v in feature_defs.items() if v[0] == "numerical"]
-categorical_cols_display  = [k for k, v in feature_defs.items() if v[0] == "categorical"]
-numerical_cols_internal   = [rename_cols[c] for c in numerical_cols_display]
+# 原始分类/数值列（display 名）
+numerical_cols_display = [k for k, v in feature_defs.items() if v[0] == "numerical"]
+categorical_cols_display = [k for k, v in feature_defs.items() if v[0] == "categorical"]
+
+# 对应的内部列名列表
+numerical_cols_internal = [rename_cols[c] for c in numerical_cols_display]
 categorical_cols_internal = [rename_cols[c] for c in categorical_cols_display]
 
 # --------------------------------------------------
@@ -66,7 +68,7 @@ categorical_cols_internal = [rename_cols[c] for c in categorical_cols_display]
 # --------------------------------------------------
 def _fig_to_png_bytes(fig):
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=300, bbox_inches="tight")
+    fig.savefig(buf, format="png", bbox_inches="tight", dpi=300)
     buf.seek(0)
     return buf.read()
 
@@ -75,11 +77,11 @@ def _fig_to_png_bytes(fig):
 # --------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def load_assets():
-    model_  = joblib.load("xgb.pkl")
+    model_ = joblib.load("xgb.pkl")      # ← 你的模型
     scaler_ = None
     if not isinstance(model_, Pipeline):
         try:
-            scaler_ = joblib.load("scaler.pkl")
+            scaler_ = joblib.load("scaler.pkl")  # ← 训练用的 Standard/MinMaxScaler
         except FileNotFoundError:
             pass
     return model_, scaler_
@@ -99,22 +101,27 @@ for feat, (ftype, default) in feature_defs.items():
     else:
         user_inputs[feat] = st.selectbox(feat, feature_defs[feat][1], index=0)
 
-user_df_raw = pd.DataFrame([user_inputs])          # display‑name columns
+user_df_raw = pd.DataFrame([user_inputs])  # 列名 = display 名
 
 # --------------------------------------------------
 # Pre‑processing – mirror training pipeline
 # --------------------------------------------------
+# 1) 改列名
 user_df_proc = user_df_raw.rename(columns=rename_cols)
+
+# 2) 类别映射
 user_df_proc[categorical_cols_internal] = (
     user_df_proc[categorical_cols_internal]
         .replace(categorical_mapping_internal)
 )
 
+# 3) 数值标准化（仅在模型非 Pipeline 且存在外部 scaler 时）
 if (external_scaler is not None) and (not uses_pipeline):
     user_df_proc[numerical_cols_internal] = external_scaler.transform(
         user_df_proc[numerical_cols_internal]
     )
 
+# 4) （可选）保证列顺序严格等于训练列顺序
 if hasattr(model, "feature_names_in_"):
     user_df_proc = user_df_proc[model.feature_names_in_]
 
@@ -122,14 +129,15 @@ if hasattr(model, "feature_names_in_"):
 # Inference & SHAP explanation
 # --------------------------------------------------
 if st.button("Predict"):
+    # ---------------- Prediction ----------------
     proba = model.predict_proba(user_df_proc)[:, 1][0]
-    st.success(f"Predicted risk of postoperative hemorrhage: {proba*100:.2f}%")
+    st.success(f"Predicted risk of postoperative hemorrhage: {proba * 100:.2f}%")
 
     # ---------------- Build SHAP explainer ----------------
     @st.cache_resource(show_spinner=False)
     def build_explainer(_m):
         try:
-            return shap.Explainer(_m)        # log‑odds explainer
+            return shap.Explainer(_m)
         except Exception:
             if isinstance(_m, Pipeline):
                 return shap.TreeExplainer(_m.steps[-1][1])
@@ -140,47 +148,50 @@ if st.button("Predict"):
     # ---------------- Compute SHAP values ----------------
     shap_values = explainer(user_df_proc)
     instance_exp = shap_values[0]
-    if instance_exp.values.ndim == 2:          # 多输出 -> 取正类
+    if instance_exp.values.ndim == 2:          # 多输出时取第 2 列（正类）
         instance_exp = instance_exp[:, 1]
 
     # =====================================================
-    # WATERFALL PLOT（位图，保持 log‑odds）
+    # WATERFALL PLOT
     # =====================================================
-    st.subheader("SHAP Waterfall Plot")
+    st.subheader("Model Explanation – SHAP Waterfall Plot")
     shap.plots.waterfall(instance_exp, max_display=15, show=False)
     fig_water = plt.gcf()
     st.pyplot(fig_water)
-    with st.expander("Download waterfall plot"):
-        st.download_button("Download PNG", _fig_to_png_bytes(fig_water),
-                           "shap_waterfall_plot.png", "image/png")
+
+    with st.expander("Download SHAP waterfall plot"):
+        st.download_button(
+            label="Download PNG",
+            data=_fig_to_png_bytes(fig_water),
+            file_name="shap_waterfall_plot.png",
+            mime="image/png",
+        )
 
     # =====================================================
-    # FORCE PLOT（交互式 HTML；显示概率）
+    # FORCE PLOT
     # =====================================================
-    st.subheader("SHAP Force Plot (Probability)")
+    st.subheader("Model Explanation – SHAP Force Plot")
 
-    force_plot = shap.plots.force(
-        instance_exp.base_values,
-        instance_exp.values,
-        features=instance_exp.data,
-        feature_names=instance_exp.feature_names,
-        link="logit",          
-        matplotlib=False,      
+    base_val = float(instance_exp.base_values if hasattr(instance_exp.base_values, "__len__") else instance_exp.base_values)
+    shap_vec = instance_exp.values
+    feature_vals = instance_exp.data
+    feature_names = instance_exp.feature_names
+
+    shap.plots.force(
+        base_val,
+        shap_vec,
+        features=feature_vals,
+        feature_names=feature_names,
+        matplotlib=True,
+        show=False,
     )
+    fig_force = plt.gcf()
+    st.pyplot(fig_force)
 
-    # --- 嵌入 Streamlit ---
-    html = f"<head>{shap.getjs()}</head><body>{force_plot.html()}</body>"
-    components.html(html, height=300, scrolling=True)
-
-    # --- （可选）提供 PNG 下载 ---
-    with st.expander("Download force plot PNG"):
-        # 把交互式图临时渲染为 PNG（利用 shap.screenshot if present）
-        try:
-            import shap
-            tmp_html = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
-            shap.save_html(tmp_html.name, force_plot)
-            png_buf = shap.utils.save_html_to_png(tmp_html.name)
-            os.unlink(tmp_html.name)
-            st.download_button("Download PNG", png_buf, "shap_force_plot.png", "image/png")
-        except Exception:
-            st.info("PNG export unavailable；请使用浏览器右键另存为图片。")
+    with st.expander("Download SHAP force plot"):
+        st.download_button(
+            label="Download PNG",
+            data=_fig_to_png_bytes(fig_force),
+            file_name="shap_force_plot.png",
+            mime="image/png",
+        )
