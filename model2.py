@@ -1,7 +1,9 @@
-import io, numpy as np
+import io
 import streamlit as st
-import joblib, pandas as pd
-import shap, matplotlib.pyplot as plt
+import joblib
+import pandas as pd
+import shap
+import matplotlib.pyplot as plt
 from sklearn.pipeline import Pipeline
 
 # --------------------------------------------------
@@ -26,7 +28,7 @@ feature_defs = {
 }
 
 # --------------------------------------------------
-# Display‑name  →  Internal‑name 映射（保持与训练一致）
+# Display‑name → Internal‑name 映射（务必与训练一致）
 # --------------------------------------------------
 rename_cols = {
     "Height": "height",
@@ -42,7 +44,7 @@ rename_cols = {
 }
 
 # --------------------------------------------------
-# 类别取值映射（键用内部列名）
+# 类别值映射（键用内部列名）
 # --------------------------------------------------
 categorical_mapping_internal = {
     "HBP": {"Yes": 1, "No": 0},
@@ -124,9 +126,8 @@ if st.button("Predict"):
     # ---------------- Build SHAP explainer ----------------
     @st.cache_resource(show_spinner=False)
     def build_explainer(_m):
-        # 使用默认 log‑odds 解释（性能最佳）
         try:
-            return shap.Explainer(_m)
+            return shap.Explainer(_m)        # 默认 log‑odds
         except Exception:
             if isinstance(_m, Pipeline):
                 return shap.TreeExplainer(_m.steps[-1][1])
@@ -141,24 +142,32 @@ if st.button("Predict"):
         instance_exp = instance_exp[:, 1]
 
     # =====================================================
-    # WATERFALL PLOT（保持原状）
+    # WATERFALL PLOT（保持 log‑odds）
     # =====================================================
-    st.subheader("Model Explanation – SHAP Waterfall Plot")
+    st.subheader("SHAP Waterfall Plot")
     shap.plots.waterfall(instance_exp, max_display=15, show=False)
-    st.pyplot(plt.gcf())
+    fig_water = plt.gcf()
+    st.pyplot(fig_water)
+    with st.expander("Download waterfall plot"):
+        st.download_button("Download PNG", _fig_to_png_bytes(fig_water),
+                           "shap_waterfall_plot.png", "image/png")
 
     # =====================================================
     # FORCE PLOT（改为概率显示）
     # =====================================================
-    st.subheader("Model Explanation – SHAP Force Plot (Probability)")
+    st.subheader("SHAP Force Plot (Probability)")
 
     shap.plots.force(
-        instance_exp.base_values,        # log‑odds base
-        instance_exp.values,             # log‑odds contributions
+        instance_exp.base_values,             # log‑odds base
+        instance_exp.values,                  # log‑odds SHAP
         features=instance_exp.data,
         feature_names=instance_exp.feature_names,
-        link="logit",                    # ⭐ 显示为概率
+        link="logit",                         # ⭐ 映射至概率
         matplotlib=True,
-        show=True,
+        show=False,
     )
-    st.pyplot(plt.gcf())
+    fig_force = plt.gcf()
+    st.pyplot(fig_force)
+    with st.expander("Download force plot"):
+        st.download_button("Download PNG", _fig_to_png_bytes(fig_force),
+                           "shap_force_plot.png", "image/png")
