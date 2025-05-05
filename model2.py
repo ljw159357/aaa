@@ -41,7 +41,6 @@ categorical_cols = [k for k, v in feature_defs.items() if v[0] == "categorical"]
 # --------------------------------------------------
 # Utility – figure serialization
 # --------------------------------------------------
-
 def _fig_to_png_bytes(fig):
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", dpi=300)
@@ -53,14 +52,16 @@ def _fig_to_png_bytes(fig):
 # --------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def load_assets():
-    """Load trained model plus optional external scaler."""
-    model_ = joblib.load("xgb.pkl")  # change if your model file has a different name
-
+    """
+    ① 加载训练好的模型 (xgb.pkl)
+    ② 如果模型不是 Pipeline，则尝试加载同一次训练里保存的外部 scaler；
+       这样就能复用训练时对数值特征做的“标准化 / 归一化”。
+    """
+    model_ = joblib.load("xgb.pkl")             # ← 改成你的模型文件名
     scaler_ = None
-    # If model_ itself is *not* a pipeline that already contains scaling, try loading an external scaler
-    if not isinstance(model_, Pipeline):
+    if not isinstance(model_, Pipeline):        # 只有非 Pipeline 才需要外部 scaler
         try:
-            scaler_ = joblib.load("scaler.pkl")  # StandardScaler / MinMaxScaler saved from training
+            scaler_ = joblib.load("scaler.pkl") # ← MinMaxScaler / StandardScaler 等
         except FileNotFoundError:
             pass
     return model_, scaler_
@@ -88,7 +89,7 @@ user_df_raw = pd.DataFrame([user_inputs])
 user_df_proc = user_df_raw.copy()
 user_df_proc[categorical_cols] = user_df_proc[categorical_cols].replace(categorical_mapping)
 
-# Apply *external* scaler only when it exists and model itself is not a pipeline
+# 如果存在外部 scaler 且模型本身不是 Pipeline，则手动做数值特征标准化
 if (external_scaler is not None) and (not uses_pipeline):
     user_df_proc[numerical_cols] = external_scaler.transform(user_df_proc[numerical_cols])
 
@@ -106,7 +107,6 @@ if st.button("Predict"):
         try:
             return shap.Explainer(_m)
         except Exception:
-            # For pipeline, attempt to grab final estimator for TreeExplainer fallback
             if isinstance(_m, Pipeline):
                 return shap.TreeExplainer(_m.steps[-1][1])
             raise
@@ -143,8 +143,8 @@ if st.button("Predict"):
     st.subheader("Model Explanation – SHAP Force Plot")
 
     base_val = float(instance_exp.base_values if hasattr(instance_exp.base_values, "__len__") else instance_exp.base_values)
-    shap_vec = instance_exp.values  # 1‑D SHAP contributions
-    feature_vals = instance_exp.data  # original feature values
+    shap_vec = instance_exp.values            # 1‑D SHAP contributions
+    feature_vals = instance_exp.data          # 原始特征值
     feature_names = instance_exp.feature_names
 
     shap.plots.force(
