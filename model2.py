@@ -12,7 +12,7 @@ from sklearn.pipeline import Pipeline
 st.set_page_config(page_title="Hemorrhage Risk Prediction", layout="centered")
 
 # --------------------------------------------------
-# Feature definitions & mappings
+# UI Feature definitions (display names)
 # --------------------------------------------------
 feature_defs = {
     "Height": ("numerical", 0.0),
@@ -27,41 +27,61 @@ feature_defs = {
     "Primary Graft Dysfunction (PGD, Level)": ("categorical", ["3", "2", "1", "0"]),
 }
 
-categorical_mapping = {
-    "HBP": {"Yes": 1, "No": 0},
-    "Postoperative CRRT (Continuous Renal Replacement Therapy)": {"Yes": 1, "No": 0},
-    "Postoperative Anticoagulation": {"Yes": 1, "No": 0},
-    "Transplant Side": {"Left": 1, "Right": 2, "Both": 0},
-    "Primary Graft Dysfunction (PGD, Level)": {"3": 3, "2": 2, "1": 1, "0": 0},
+# --------------------------------------------------
+# 1) Display‑name  →  Internal‑name 映射
+#    **务必与训练阶段保持完全一致！**
+# --------------------------------------------------
+rename_cols = {
+    "Height": "height",
+    "HBP": "HBP",
+    "Postoperative Platelet Count (x10⁹/L)": "post_PLT",
+    "Urgent Postoperative APTT (s)": "post_APTT_e",
+    "Day 1 Postoperative APTT (s)": "post_APTT_1",
+    "Day 1 Postoperative Antithrombin III Activity (%)": "post_Antithrombin_III_1",
+    "Postoperative CRRT (Continuous Renal Replacement Therapy)": "post_CRRT",
+    "Postoperative Anticoagulation": "anticoagulant_therapy",
+    "Transplant Side": "transplant_side",
+    "Primary Graft Dysfunction (PGD, Level)": "PGD",
 }
 
-numerical_cols = [k for k, v in feature_defs.items() if v[0] == "numerical"]
-categorical_cols = [k for k, v in feature_defs.items() if v[0] == "categorical"]
+# --------------------------------------------------
+# 2) 类别取值映射（键用内部列名）
+# --------------------------------------------------
+categorical_mapping_internal = {
+    "HBP": {"Yes": 1, "No": 0},
+    "post_CRRT": {"Yes": 1, "No": 0},
+    "anticoagulant_therapy": {"Yes": 1, "No": 0},
+    "transplant_side": {"Left": 1, "Right": 2, "Both": 0},
+    "PGD": {"3": 3, "2": 2, "1": 1, "0": 0},
+}
+
+# 原始分类/数值列（display 名）
+numerical_cols_display = [k for k, v in feature_defs.items() if v[0] == "numerical"]
+categorical_cols_display = [k for k, v in feature_defs.items() if v[0] == "categorical"]
+
+# 对应的内部列名列表
+numerical_cols_internal = [rename_cols[c] for c in numerical_cols_display]
+categorical_cols_internal = [rename_cols[c] for c in categorical_cols_display]
 
 # --------------------------------------------------
 # Utility – figure serialization
 # --------------------------------------------------
 def _fig_to_png_bytes(fig):
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", dpi=300)
+    fig.savefig(buf, format="png", bbox_inches="tight", dpi=300, bbox_inches="tight")
     buf.seek(0)
     return buf.read()
 
 # --------------------------------------------------
-# Load model & scaler
+# Load model & (optional) external scaler
 # --------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def load_assets():
-    """
-    ① 加载训练好的模型 (xgb.pkl)
-    ② 如果模型不是 Pipeline，则尝试加载同一次训练里保存的外部 scaler；
-       这样就能复用训练时对数值特征做的“标准化 / 归一化”。
-    """
-    model_ = joblib.load("xgb.pkl")             # ← 改成你的模型文件名
+    model_ = joblib.load("xgb.pkl")      # ← 你的模型
     scaler_ = None
-    if not isinstance(model_, Pipeline):        # 只有非 Pipeline 才需要外部 scaler
+    if not isinstance(model_, Pipeline):
         try:
-            scaler_ = joblib.load("scaler.pkl") # ← MinMaxScaler / StandardScaler 等
+            scaler_ = joblib.load("scaler.pkl")  # ← 训练用的 Standard/MinMaxScaler
         except FileNotFoundError:
             pass
     return model_, scaler_
@@ -81,17 +101,29 @@ for feat, (ftype, default) in feature_defs.items():
     else:
         user_inputs[feat] = st.selectbox(feat, feature_defs[feat][1], index=0)
 
-user_df_raw = pd.DataFrame([user_inputs])
+user_df_raw = pd.DataFrame([user_inputs])  # 列名 = display 名
 
 # --------------------------------------------------
 # Pre‑processing – mirror training pipeline
 # --------------------------------------------------
-user_df_proc = user_df_raw.copy()
-user_df_proc[categorical_cols] = user_df_proc[categorical_cols].replace(categorical_mapping)
+# 1) 改列名
+user_df_proc = user_df_raw.rename(columns=rename_cols)
 
-# 如果存在外部 scaler 且模型本身不是 Pipeline，则手动做数值特征标准化
+# 2) 类别映射
+user_df_proc[categorical_cols_internal] = (
+    user_df_proc[categorical_cols_internal]
+        .replace(categorical_mapping_internal)
+)
+
+# 3) 数值标准化（仅在模型非 Pipeline 且存在外部 scaler 时）
 if (external_scaler is not None) and (not uses_pipeline):
-    user_df_proc[numerical_cols] = external_scaler.transform(user_df_proc[numerical_cols])
+    user_df_proc[numerical_cols_internal] = external_scaler.transform(
+        user_df_proc[numerical_cols_internal]
+    )
+
+# 4) （可选）保证列顺序严格等于训练列顺序
+if hasattr(model, "feature_names_in_"):
+    user_df_proc = user_df_proc[model.feature_names_in_]
 
 # --------------------------------------------------
 # Inference & SHAP explanation
@@ -114,11 +146,9 @@ if st.button("Predict"):
     explainer = build_explainer(model)
 
     # ---------------- Compute SHAP values ----------------
-    shap_exp = explainer(user_df_proc)
-
-    # ---------------- Select explanation for positive class (if binary) ----------------
-    instance_exp = shap_exp[0]
-    if instance_exp.values.ndim == 2:  # shape (n_features, n_outputs)
+    shap_values = explainer(user_df_proc)
+    instance_exp = shap_values[0]
+    if instance_exp.values.ndim == 2:          # 多输出时取第 2 列（正类）
         instance_exp = instance_exp[:, 1]
 
     # =====================================================
@@ -143,8 +173,8 @@ if st.button("Predict"):
     st.subheader("Model Explanation – SHAP Force Plot")
 
     base_val = float(instance_exp.base_values if hasattr(instance_exp.base_values, "__len__") else instance_exp.base_values)
-    shap_vec = instance_exp.values            # 1‑D SHAP contributions
-    feature_vals = instance_exp.data          # 原始特征值
+    shap_vec = instance_exp.values
+    feature_vals = instance_exp.data
     feature_names = instance_exp.feature_names
 
     shap.plots.force(
