@@ -68,7 +68,7 @@ categorical_cols_internal = [rename_cols[c] for c in categorical_cols_display]
 # --------------------------------------------------
 def _fig_to_png_bytes(fig):
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", dpi=300)
+    fig.savefig(buf, format="png", dpi=300, bbox_inches="tight")
     buf.seek(0)
     return buf.read()
 
@@ -77,11 +77,11 @@ def _fig_to_png_bytes(fig):
 # --------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def load_assets():
-    model_ = joblib.load("xgb.pkl")      # ← 你的模型
+    model_ = joblib.load("xgb.pkl")      # ← 你的模型文件
     scaler_ = None
     if not isinstance(model_, Pipeline):
         try:
-            scaler_ = joblib.load("scaler.pkl")  # ← 训练用的 Standard/MinMaxScaler
+            scaler_ = joblib.load("scaler.pkl")  # ← 训练阶段保存的 Standard/MinMaxScaler
         except FileNotFoundError:
             pass
     return model_, scaler_
@@ -136,11 +136,14 @@ if st.button("Predict"):
     # ---------------- Build SHAP explainer ----------------
     @st.cache_resource(show_spinner=False)
     def build_explainer(_m):
+        """
+        model_output="probability" 让 SHAP 直接解释概率而非 log‑odds
+        """
         try:
-            return shap.Explainer(_m)
+            return shap.Explainer(_m, model_output="probability")
         except Exception:
             if isinstance(_m, Pipeline):
-                return shap.TreeExplainer(_m.steps[-1][1])
+                return shap.TreeExplainer(_m.steps[-1][1], model_output="probability")
             raise
 
     explainer = build_explainer(model)
