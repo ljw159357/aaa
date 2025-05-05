@@ -68,7 +68,7 @@ categorical_cols_internal = [rename_cols[c] for c in categorical_cols_display]
 # --------------------------------------------------
 def _fig_to_png_bytes(fig):
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", dpi=300, bbox_inches="tight")
+    fig.savefig(buf, format="png", bbox_inches="tight", dpi=300)
     buf.seek(0)
     return buf.read()
 
