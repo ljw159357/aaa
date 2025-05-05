@@ -159,6 +159,6 @@ if st.button("Predict"):
         feature_names=instance_exp.feature_names,
         link="logit",                    # ⭐ 显示为概率
         matplotlib=True,
-        show=False,
+        show=True,
     )
     st.pyplot(plt.gcf())
