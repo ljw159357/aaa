@@ -37,7 +37,7 @@ rename_cols = {
     "Postoperative Platelet Count (x10⁹/L)": "post_PLT",
     "Urgent Postoperative APTT (s)": "post_APTT_e",
     "Day 1 Postoperative APTT (s)": "post_APTT_1",
-    "Day 1 Postoperative Antithrombin III Activity (%)": "post_antithrombin_III_1",
+    "Day 1 Postoperative Antithrombin III Activity (%)": "post_antithrombase_III_1",
     "Postoperative CRRT (Continuous Renal Replacement Therapy)": "post_CRRT",
     "Postoperative Anticoagulation": "anticoagulant_therapy",
     "Transplant Side": "transplant_side",
