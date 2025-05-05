@@ -1,9 +1,8 @@
-import io
+import io, tempfile, os, base64
 import streamlit as st
-import joblib
-import pandas as pd
-import shap
-import matplotlib.pyplot as plt
+import streamlit.components.v1 as components
+import joblib, pandas as pd
+import shap, matplotlib.pyplot as plt
 from sklearn.pipeline import Pipeline
 
 # --------------------------------------------------
@@ -54,6 +53,9 @@ categorical_mapping_internal = {
     "PGD": {"3": 3, "2": 2, "1": 1, "0": 0},
 }
 
+# --------------------------------------------------
+# Lists of columns
+# --------------------------------------------------
 numerical_cols_display    = [k for k, v in feature_defs.items() if v[0] == "numerical"]
 categorical_cols_display  = [k for k, v in feature_defs.items() if v[0] == "categorical"]
 numerical_cols_internal   = [rename_cols[c] for c in numerical_cols_display]
@@ -127,7 +129,7 @@ if st.button("Predict"):
     @st.cache_resource(show_spinner=False)
     def build_explainer(_m):
         try:
-            return shap.Explainer(_m)        # 默认 log‑odds
+            return shap.Explainer(_m)        # log‑odds explainer
         except Exception:
             if isinstance(_m, Pipeline):
                 return shap.TreeExplainer(_m.steps[-1][1])
@@ -142,7 +144,7 @@ if st.button("Predict"):
         instance_exp = instance_exp[:, 1]
 
     # =====================================================
-    # WATERFALL PLOT（保持 log‑odds）
+    # WATERFALL PLOT（位图，保持 log‑odds）
     # =====================================================
     st.subheader("SHAP Waterfall Plot")
     shap.plots.waterfall(instance_exp, max_display=15, show=False)
@@ -153,21 +155,32 @@ if st.button("Predict"):
                            "shap_waterfall_plot.png", "image/png")
 
     # =====================================================
-    # FORCE PLOT（改为概率显示）
+    # FORCE PLOT（交互式 HTML；显示概率）
     # =====================================================
     st.subheader("SHAP Force Plot (Probability)")
 
-    shap.plots.force(
-        instance_exp.base_values,             # log‑odds base
-        instance_exp.values,                  # log‑odds SHAP
+    force_plot = shap.plots.force(
+        instance_exp.base_values,
+        instance_exp.values,
         features=instance_exp.data,
         feature_names=instance_exp.feature_names,
-        link="logit",                         # ⭐ 映射至概率
-        matplotlib=True,
-        show=False,
+        link="logit",          
+        matplotlib=False,      
     )
-    fig_force = plt.gcf()
-    st.pyplot(fig_force)
-    with st.expander("Download force plot"):
-        st.download_button("Download PNG", _fig_to_png_bytes(fig_force),
-                           "shap_force_plot.png", "image/png")
+
+    # --- 嵌入 Streamlit ---
+    html = f"<head>{shap.getjs()}</head><body>{force_plot.html()}</body>"
+    components.html(html, height=300, scrolling=True)
+
+    # --- （可选）提供 PNG 下载 ---
+    with st.expander("Download force plot PNG"):
+        # 把交互式图临时渲染为 PNG（利用 shap.screenshot if present）
+        try:
+            import shap
+            tmp_html = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
+            shap.save_html(tmp_html.name, force_plot)
+            png_buf = shap.utils.save_html_to_png(tmp_html.name)
+            os.unlink(tmp_html.name)
+            st.download_button("Download PNG", png_buf, "shap_force_plot.png", "image/png")
+        except Exception:
+            st.info("PNG export unavailable；请使用浏览器右键另存为图片。")
