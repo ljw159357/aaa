@@ -1,5 +1,6 @@
 import io
 import streamlit as st
+import streamlit.components.v1 as components
 import joblib
 import pandas as pd
 import shap
@@ -28,7 +29,7 @@ feature_defs = {
 }
 
 # --------------------------------------------------
-# Display‑name → Internal‑name 映射（务必与训练一致）
+# Display‑name  →  Internal‑name 映射（务必与训练一致）
 # --------------------------------------------------
 rename_cols = {
     "Height": "height",
@@ -142,32 +143,28 @@ if st.button("Predict"):
         instance_exp = instance_exp[:, 1]
 
     # =====================================================
-    # WATERFALL PLOT（保持 log‑odds）
+    # WATERFALL PLOT（matplotlib 版，仍为 log‑odds）
     # =====================================================
     st.subheader("SHAP Waterfall Plot")
     shap.plots.waterfall(instance_exp, max_display=15, show=False)
     fig_water = plt.gcf()
     st.pyplot(fig_water)
-    with st.expander("Download waterfall plot"):
-        st.download_button("Download PNG", _fig_to_png_bytes(fig_water),
-                           "shap_waterfall_plot.png", "image/png")
 
     # =====================================================
-    # FORCE PLOT（改为概率显示）
+    # FORCE PLOT（HTML 版，f(x) = 概率）
     # =====================================================
     st.subheader("SHAP Force Plot (Probability)")
 
-    shap.plots.force(
-        instance_exp.base_values,             # log‑odds base
-        instance_exp.values,                  # log‑odds SHAP
+    force_plot = shap.force_plot(
+        instance_exp.base_values,
+        instance_exp.values,
         features=instance_exp.data,
         feature_names=instance_exp.feature_names,
-        link="logit",                         # ⭐ 映射至概率
-        matplotlib=True,
-        show=False,
+        link="logit",              
+        matplotlib=False           
     )
-    fig_force = plt.gcf()
-    st.pyplot(fig_force)
-    with st.expander("Download force plot"):
-        st.download_button("Download PNG", _fig_to_png_bytes(fig_force),
-                           "shap_force_plot.png", "image/png")
+
+    # 把 SHAP 自带 JS + HTML 插入 Streamlit
+    force_html = f"<head>{shap.getjs()}</head><body>{force_plot.html()}</body>"
+    components.html(force_html, height=300, scrolling=True)
+
