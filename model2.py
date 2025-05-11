@@ -6,9 +6,6 @@ import shap
 import matplotlib.pyplot as plt
 from sklearn.pipeline import Pipeline
 
-# --------------------------------------------------
-# Page configuration
-# --------------------------------------------------
 st.set_page_config(page_title="Hemorrhage Risk Prediction", layout="centered")
 
 # --------------------------------------------------
